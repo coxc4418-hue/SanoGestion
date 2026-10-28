@@ -1,0 +1,10 @@
+{
+  "name": "sanogestion-scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "firebase": "^10.14.1",
+    "puppeteer-core": "^23.6.0"
+  },
+  "description": "Scripts de SanoGestion: alta de sedes, pruebas y video tutorial"
+}

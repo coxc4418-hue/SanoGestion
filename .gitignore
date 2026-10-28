@@ -1,0 +1,25 @@
+# Contraseñas y datos privados: NUNCA subir
+CREDENCIALES*.txt
+scripts/.accounts*.json
+.env
+.env.*
+
+# Dependencias y caché
+node_modules/
+.firebase/
+
+# Registros de Firebase y de las pruebas
+*.log
+scripts/tests/downloads/
+scripts/tests/tour-shots/
+scripts/tests/*.png
+
+# Archivos temporales del video tutorial (el video final está en public/tutorial)
+scripts/tutorial/work/
+scripts/tutorial/out/
+/Tutorial/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini

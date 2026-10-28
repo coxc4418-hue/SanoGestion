@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// SanoGestion — Reglas de seguridad multisede
+// Cada sede (cuenta) solo puede leer/escribir sus propios datos en tenants/{uid}.
+// El administrador general puede ver y gestionar todas las sedes.
+// Las demos (sesión anónima) caducan a los 30 minutos: después solo pueden borrar sus datos.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'admin@sanogestion.app'
+        && request.auth.token.firebase.sign_in_provider == 'password';
+    }
+
+    function isAnon() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    function isOwner(tenantId) {
+      return signedIn() && request.auth.uid == tenantId;
+    }
+
+    function tenantData(tenantId) {
+      return get(/databases/$(database)/documents/tenants/$(tenantId)).data;
+    }
+
+    function tenantActive(tenantId) {
+      return tenantData(tenantId).get('active', true) == true;
+    }
+
+    // Una demo solo puede crear/modificar datos mientras no haya vencido
+    function demoValid(tenantId) {
+      return tenantData(tenantId).get('demo', false) != true
+        || tenantData(tenantId).expiresAt > request.time;
+    }
+
+    // Usuario → correo (para iniciar sesión con el nombre de usuario)
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isSuperAdmin();
+    }
+
+    match /tenants/{tenantId} {
+      allow get: if isSuperAdmin() || isOwner(tenantId);
+      allow list: if isSuperAdmin();
+
+      // La sede crea su propio documento la primera vez (siempre activa).
+      // Una sesión anónima solo puede crear una demo de máximo 31 minutos.
+      allow create: if isSuperAdmin()
+        || (isOwner(tenantId)
+            && request.resource.data.active == true
+            && request.resource.data.ownerUid == request.auth.uid
+            && (!isAnon() || (request.resource.data.demo == true
+                && request.resource.data.expiresAt <= request.time + duration.value(31, 'm'))));
+
+      // La sede puede actualizar su nombre/datos, pero no su estado, identidad ni vencimiento.
+      allow update: if isSuperAdmin()
+        || (isOwner(tenantId)
+            && !request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAny(['active', 'ownerUid', 'ownerEmail', 'code', 'createdAt', 'demo', 'expiresAt', 'expireAt']));
+
+      allow delete: if isSuperAdmin() || (isOwner(tenantId) && resource.data.get('demo', false) == true);
+
+      // Todos los datos del negocio (productos, ventas, caja, clientes...)
+      match /{collection}/{docId} {
+        allow read, delete: if isSuperAdmin() || (isOwner(tenantId) && tenantActive(tenantId));
+        allow create, update: if isSuperAdmin() || (isOwner(tenantId) && tenantActive(tenantId) && demoValid(tenantId));
+      }
+    }
+
+    // Cualquier otra ruta queda bloqueada.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
