@@ -22,6 +22,8 @@ async function newPage(w = 1366, h = 900) {
   await p.setViewport({ width: w, height: h });
   p.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/favicon|analytics|dolarapi|ERR_|net::|400|PERMISSION_DENIED/.test(m.text())) errors.push('console: ' + m.text()); });
+  // El selector de país aparece la primera vez: en las pruebas se elige Venezuela (dólares + tasa BCV)
+  await p.evaluateOnNewDocument(() => { new MutationObserver(() => { const b = document.querySelector('.country-grid [data-c="VE"]'); const ok = b && [...document.querySelectorAll('.modal [data-ok]')].pop(); if (b && ok && !window.__ctry) { window.__ctry = 1; b.click(); setTimeout(() => { [...document.querySelectorAll('.modal [data-ok]')].pop()?.click(); setTimeout(() => { window.__ctry = 0; }, 1500); }, 150); } }).observe(document, { childList: true, subtree: true }); });
   await p.evaluateOnNewDocument(() => { window.print = () => {}; window.__printed = 0; const o = HTMLIFrameElement.prototype; });
   const cdp = await p.createCDPSession();
   await cdp.send('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: DL, browserContextId: ctx.id, eventsEnabled: true }).catch(() => cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: DL }));
@@ -92,8 +94,11 @@ try {
   // ====================================================================
   section('1. Inicio de sesión y configuración inicial');
   await login('sede01', s1.password);
-  await waitText('Tasa de cambio del día');
-  await type(M + '[data-rate]', String(RATE)); await click(M + '[data-save]'); await sleep(800);
+  // La tasa BCV se carga sola; si no hay internet aparece el aviso para escribirla a mano
+  await p.waitForFunction(() => document.body.innerText.includes('Tasa de cambio del día') || document.body.innerText.includes('Hola,'), { timeout: 20000 });
+  await sleep(2500);
+  if (await p.evaluate(() => document.body.innerText.includes('Tasa de cambio del día'))) { await type(M + '[data-rate]', String(RATE)); await click(M + '[data-save]'); await sleep(800); }
+  else { await closeModals(); await S((s, r) => s.setRate(r), RATE); await sleep(800); }
   check(await S((s) => s.rate) === RATE, `tasa del día configurada en Bs ${RATE}`);
   await nav('ajustes');
   await type('#f-biz input[name=businessName]', 'Bodega Prueba Total');

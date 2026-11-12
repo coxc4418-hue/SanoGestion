@@ -1,6 +1,6 @@
 // SanoGestion — Componentes compartidos entre vistas
 import { store } from './store.js';
-import { openModal, toast, num, esc, parseNum, fmtDateTime, setBusy, usd, bs, methodLabel, qtyFmt, printHTML, fmtDate, todayKey } from './utils.js';
+import { openModal, toast, num, esc, parseNum, fmtDateTime, setBusy, usd, bs, methodLabel, qtyFmt, printHTML, fmtDate, todayKey, dayKey, isVE } from './utils.js';
 import { icon } from './icons.js';
 
 /** Obtiene la tasa oficial BCV desde un servicio público (si está disponible). */
@@ -17,7 +17,23 @@ export async function fetchBcvRate() {
   } finally { clearTimeout(t); }
 }
 
+/** Trae la tasa oficial del BCV una vez al día (Venezuela) */
+export async function autoUpdateRate() {
+  if (!isVE()) return false;
+  const s = store.settings;
+  if (s.rateAuto === false) return false;
+  if (s.rateUpdatedAt && dayKey(new Date(s.rateUpdatedAt)) === todayKey() && store.rate > 0) return false;
+  try {
+    const r = await fetchBcvRate();
+    if (Math.abs(r.rate - store.rate) < 0.0001 && s.rateUpdatedAt && dayKey(new Date(s.rateUpdatedAt)) === todayKey()) return false;
+    await store.setRate(Math.round(r.rate * 100) / 100, true);
+    toast(`Tasa BCV del día actualizada: ${bs(r.rate)}`, 'info', 4000);
+    return true;
+  } catch (_) { return false; }
+}
+
 export function openRateModal() {
+  if (!isVE()) { import('./country.js').then((m) => m.openCountryPicker()); return; }
   const s = store.settings;
   const m = openModal({
     title: 'Tasa de cambio del día',
@@ -52,7 +68,7 @@ export function openRateModal() {
     const v = parseNum(input.value);
     if (!(v > 0)) { toast('Ingresa una tasa válida', 'warning'); input.focus(); return; }
     await store.setRate(v);
-    toast(`Tasa actualizada: Bs ${num(v)} por $1`);
+    toast(`Tasa actualizada: ${bs(v)} por $1`);
     m.close();
   };
   m.el.querySelector('[data-f]').onsubmit = save;
@@ -68,11 +84,11 @@ export function receiptHTML(sale) {
   const rate = sale.rate || 0;
   const items = (sale.items || []).map((it) => `
     <tr><td colspan="3" style="padding-top:3px">${esc(it.name)}${it.presentation && it.presentation !== 'Unidad' ? ' (' + esc(it.presentation) + ')' : ''}</td></tr>
-    <tr><td>${qtyFmt(it.qty)} x ${num(it.price)}</td><td></td><td style="text-align:right">$${num(it.total)}</td></tr>`).join('');
+    <tr><td>${qtyFmt(it.qty)} x ${num(it.price)}</td><td></td><td style="text-align:right">${usd(it.total)}</td></tr>`).join('');
   const taxable = (sale.items || []).filter((i) => !i.exempt).reduce((a, i) => a + (i.total || 0), 0) * (sale.total / (sale.subtotal || sale.total || 1));
   const ivaPct = Number(s.iva) || 0;
   const ivaBs = ivaPct > 0 ? (taxable - taxable / (1 + ivaPct / 100)) * rate : 0;
-  const pays = (sale.payments || []).map((p) => `<tr><td>${esc(methodLabel(p.method))}</td><td></td><td style="text-align:right">${p.currency === 'BS' ? 'Bs ' + num(p.amount) : '$' + num(p.amount)}</td></tr>`).join('');
+  const pays = (sale.payments || []).map((p) => `<tr><td>${esc(methodLabel(p.method))}</td><td></td><td style="text-align:right">${p.currency === 'BS' ? bs(p.amount) : usd(p.amount)}</td></tr>`).join('');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recibo ${esc(sale.number)}</title>
   <style>
     @page { margin: ${fmt === 'carta' ? '14mm' : '2mm'}; }
@@ -94,16 +110,16 @@ export function receiptHTML(sale) {
     <table>${items}</table>
     <div class="hr"></div>
     <table>
-      <tr><td>Subtotal</td><td></td><td style="text-align:right">$${num(sale.subtotal)}</td></tr>
-      ${sale.discount > 0 ? `<tr><td>Descuento</td><td></td><td style="text-align:right">-$${num(sale.discount)}</td></tr>` : ''}
-      <tr class="big"><td>TOTAL $</td><td></td><td style="text-align:right">$${num(sale.total)}</td></tr>
-      <tr class="big"><td>TOTAL Bs</td><td></td><td style="text-align:right">${num(sale.totalBs)}</td></tr>
-      <tr><td colspan="3">Tasa BCV: Bs ${num(rate)} / $</td></tr>
-      ${ivaBs > 0.009 ? `<tr><td colspan="2">IVA ${num(ivaPct, 0)}% incluido</td><td style="text-align:right">Bs ${num(ivaBs)}</td></tr>` : ''}
+      <tr><td>Subtotal</td><td></td><td style="text-align:right">${usd(sale.subtotal)}</td></tr>
+      ${sale.discount > 0 ? `<tr><td>Descuento</td><td></td><td style="text-align:right">-${usd(sale.discount)}</td></tr>` : ''}
+      <tr class="big"><td>TOTAL $</td><td></td><td style="text-align:right">${usd(sale.total)}</td></tr>
+      ${isVE() ? `<tr class="big"><td>TOTAL Bs</td><td></td><td style="text-align:right">${num(sale.totalBs)}</td></tr>` : ''}
+      ${isVE() ? `<tr><td colspan="3">Tasa BCV: ${bs(rate)} / $</td></tr>` : ''}
+      ${ivaBs > 0.009 ? `<tr><td colspan="2">IVA ${num(ivaPct, 0)}% incluido</td><td style="text-align:right">${bs(ivaBs)}</td></tr>` : ''}
     </table>
     ${pays ? `<div class="hr"></div><table>${pays}</table>` : ''}
-    ${sale.changeUSD > 0.009 ? `<div>Vuelto: ${sale.changeCurrency === 'BS' ? 'Bs ' + num(sale.changeUSD * rate) : '$' + num(sale.changeUSD)}</div>` : ''}
-    ${sale.creditUSD > 0.009 ? `<div class="b">Saldo a crédito: $${num(sale.creditUSD)}</div>` : ''}
+    ${sale.changeUSD > 0.009 ? `<div>Vuelto: ${sale.changeCurrency === 'BS' ? bs(sale.changeUSD * rate) : usd(sale.changeUSD)}</div>` : ''}
+    ${sale.creditUSD > 0.009 ? `<div class="b">Saldo a crédito: ${usd(sale.creditUSD)}</div>` : ''}
     ${sale.note ? `<div>Nota: ${esc(sale.note)}</div>` : ''}
     <div class="hr"></div>
     <div class="c">${esc(s.receiptFooter || '¡Gracias por su compra!')}</div>

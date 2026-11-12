@@ -1,7 +1,7 @@
 // SanoGestion — Configuración de la sede
 import { store, updateTenant } from '../store.js';
 import { session, requirePin, changePassword, authErrorMessage, usernameOf } from '../auth.js';
-import { esc, num, parseNum, toast, openModal, confirmDialog, setBusy, fmtDateTime, download, todayKey, nowISO, toggleTheme } from '../utils.js';
+import { esc, num, parseNum, toast, openModal, confirmDialog, setBusy, fmtDateTime, download, todayKey, nowISO, toggleTheme, bs } from '../utils.js';
 import { icon } from '../icons.js';
 import { openRateModal } from '../shared.js';
 import { openCategories } from './inventory.js';
@@ -35,7 +35,7 @@ export function mount(el) {
         <div class="card">
           <div class="card-header"><div class="card-title"><span class="ico">${icon('dollar')}</span>Moneda, impuestos y crédito</div></div>
           <div class="summary-box between mb">
-            <div><div class="label">Tasa BCV del día</div><div class="kpi-value text-bs" style="font-size:22px;margin:0">Bs ${num(s.rate)}</div><div class="xs muted">${s.rateUpdatedAt ? 'Actualizada ' + fmtDateTime(s.rateUpdatedAt) : 'Sin configurar'}</div></div>
+            <div><div class="label">Tasa BCV del día</div><div class="kpi-value text-bs" style="font-size:22px;margin:0">${bs(s.rate)}</div><div class="xs muted">${s.rateUpdatedAt ? 'Actualizada ' + fmtDateTime(s.rateUpdatedAt) : 'Sin configurar'}</div></div>
             <button class="btn btn-primary" id="b-rate">${icon('refresh')} Actualizar tasa</button>
           </div>
           <form class="form-grid" id="f-tax">

@@ -3,7 +3,7 @@ import {
   db, collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot, query, where, orderBy, limit,
   writeBatch, increment
 } from './firebase.js';
-import { addDays, startOfDay, sha256, toast } from './utils.js';
+import { addDays, startOfDay, sha256, toast, applyLocale, isVE } from './utils.js';
 
 export const DEFAULT_CATEGORIES = [
   'Víveres', 'Bebidas', 'Lácteos', 'Charcutería', 'Limpieza', 'Higiene personal',
@@ -117,6 +117,7 @@ class Store {
     });
     listen(this.ref('config', 'settings'), 'settings', (s) => {
       this.settings = { ...DEFAULT_SETTINGS, ...(s.exists() ? s.data() : {}) };
+      applyLocale(this.settings.country || 'VE');
       if (!Array.isArray(this.settings.categories) || !this.settings.categories.length) this.settings.categories = DEFAULT_CATEGORIES;
     });
     this._unsubs.push(onSnapshot(this.ref('config', 'security'), (s) => { this.security = s.exists() ? s.data() : {}; }, () => {}));
@@ -157,19 +158,25 @@ class Store {
   }
 
   // ---------- Ajustes ----------
-  get rate() { return Number(this.settings.rate) || 0; }
+  get rate() { return isVE() ? (Number(this.settings.rate) || 0) : 1; }
   get businessName() { return this.settings.businessName || this.tenant?.name || 'Mi negocio'; }
 
+  /** País de trabajo: moneda, formas de pago y prefijo de WhatsApp */
+  async setCountry(code) {
+    const l = applyLocale(code);
+    await this.saveSettings({ country: code, currency: l.cur, countrySetAt: new Date().toISOString() });
+    this.emit('rate', this.rate);
+  }
   async saveSettings(patch) {
     Object.assign(this.settings, patch);
     await this.save('config', 'settings', patch, true);
     this.emit('settings');
   }
 
-  async setRate(rate) {
+  async setRate(rate, auto = false) {
     const v = Number(rate);
     if (!(v > 0)) throw new Error('Tasa inválida');
-    await this.saveSettings({ rate: v, rateUpdatedAt: new Date().toISOString() });
+    await this.saveSettings({ rate: v, rateUpdatedAt: new Date().toISOString(), rateSource: auto ? 'bcv' : 'manual' });
     this.emit('rate', v);
   }
 

@@ -101,7 +101,7 @@ export function mount(el, { navigate }) {
           <div class="card-header"><div class="card-title"><span class="ico">${icon('chart')}</span>Ventas de los últimos 7 días</div><span class="badge badge-neutral">${usd(days.reduce((a, d) => a + d.tot, 0))}</span></div>
           <div class="chart">${days.map((d) => `
             <div class="chart-col ${d.k === today ? 'today' : ''}">
-              <span class="chart-val">${d.tot > 0 ? '$' + num(d.tot, d.tot >= 1000 ? 0 : 2) : ''}</span>
+              <span class="chart-val">${d.tot > 0 ? usd(d.tot, d.tot >= 1000 ? 0 : 2) : ''}</span>
               <div class="chart-bar" style="height:${Math.max(2, (d.tot / maxDay) * 100)}%"></div>
               <span class="chart-lbl">${d.label}</span>
             </div>`).join('')}</div>

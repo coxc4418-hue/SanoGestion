@@ -2,7 +2,7 @@
 import { store } from '../store.js';
 import { requirePin } from '../auth.js';
 import { openShift, closeShift, cashMovement } from '../ops.js';
-import { esc, usd, bs, num, toast, openModal, emptyState, fmtDateTime, fmtTime, parseNum, setBusy, round2, methodLabel, PAY_METHODS } from '../utils.js';
+import { esc, usd, bs, num, toast, openModal, emptyState, fmtDateTime, fmtTime, parseNum, setBusy, round2, methodLabel, PAY_METHODS, loc, isVE } from '../utils.js';
 import { icon } from '../icons.js';
 import { printDoc } from '../shared.js';
 
@@ -19,8 +19,8 @@ export function openShiftModal() {
   const m = openModal({
     title: 'Abrir caja', sub: 'Indica el efectivo con el que inicias el turno', size: 'sm',
     body: `<form class="stack" data-f>
-      <div class="field"><label>Efectivo inicial en dólares</label><div class="input-group"><span class="prefix">$</span><input class="input input-lg" data-u inputmode="decimal" value="0" autofocus></div></div>
-      <div class="field"><label>Efectivo inicial en bolívares</label><div class="input-group"><span class="prefix">Bs</span><input class="input input-lg" data-b inputmode="decimal" value="0"></div></div>
+      <div class="field"><label>Efectivo inicial${isVE() ? ' en dólares' : ''}</label><div class="input-group"><span class="prefix">${esc(loc().sym)}</span><input class="input input-lg" data-u inputmode="decimal" value="0" autofocus></div></div>
+      <div class="field bs-only"><label>Efectivo inicial en bolívares</label><div class="input-group"><span class="prefix">Bs</span><input class="input input-lg" data-b inputmode="decimal" value="0"></div></div>
       <div class="field"><label>Nota (opcional)</label><input class="input" data-n placeholder="Ej.: turno mañana"></div>
     </form>`,
     footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" data-ok>${icon('unlock')} Abrir turno</button>`
@@ -45,7 +45,7 @@ function movementModal(direction) {
     body: `<form class="stack" data-f>
       <div class="field"><label>Concepto *</label><input class="input" data-c required autofocus placeholder="${direction === 'out' ? 'Ej.: pago a proveedor de hielo' : 'Ej.: sencillo para vuelto'}"></div>
       <div class="form-grid">
-        <div class="field"><label>Moneda</label><select class="select" data-cur><option value="USD">Dólares ($)</option><option value="BS">Bolívares (Bs)</option></select></div>
+        <div class="field bs-only"><label>Moneda</label><select class="select" data-cur><option value="USD">Dólares ($)</option><option value="BS">Bolívares (Bs)</option></select></div>
         <div class="field"><label>Monto *</label><input class="input" data-a inputmode="decimal" placeholder="0,00"></div>
       </div>
       <div class="field"><label>Categoría</label><select class="select" data-cat>${cats.map((c) => `<option>${c}</option>`).join('')}</select></div>
@@ -81,9 +81,9 @@ function closeModal(shift) {
     title: 'Cierre de caja', sub: 'Cuenta el efectivo físico de cada moneda',
     body: `<form class="stack" data-f>
       <div class="cash-cols">
-        <div class="cash-cur"><h4>Dólares</h4><div class="small muted">Esperado</div><div class="cash-expected">${usd(exp.usd)}</div>
-          <div class="field mt"><label>Contado ($)</label><input class="input input-lg" data-u inputmode="decimal" value="${num(exp.usd)}"></div><div class="bold mt" data-du></div></div>
-        <div class="cash-cur"><h4>Bolívares</h4><div class="small muted">Esperado</div><div class="cash-expected text-bs">${bs(exp.bs)}</div>
+        <div class="cash-cur"><h4>${isVE() ? 'Dólares' : esc(loc().curName)}</h4><div class="small muted">Esperado</div><div class="cash-expected">${usd(exp.usd)}</div>
+          <div class="field mt"><label>Contado (${esc(loc().sym)})</label><input class="input input-lg" data-u inputmode="decimal" value="${num(exp.usd)}"></div><div class="bold mt" data-du></div></div>
+        <div class="cash-cur bs-only"><h4>Bolívares</h4><div class="small muted">Esperado</div><div class="cash-expected text-bs">${bs(exp.bs)}</div>
           <div class="field mt"><label>Contado (Bs)</label><input class="input input-lg" data-b inputmode="decimal" value="${num(exp.bs)}"></div><div class="bold mt" data-db></div></div>
       </div>
       <div class="field"><label>Notas del cierre</label><input class="input" data-n placeholder="Turno sin novedades"></div>
@@ -132,15 +132,15 @@ async function printShift(s) {
       <div class="kpi">Gastos<b>${usd(s.expensesUSD || 0)}</b></div>
     </div>
     <h2>Efectivo</h2>
-    <table><thead><tr><th></th><th class="r">Dólares</th><th class="r">Bolívares</th></tr></thead><tbody>
-      <tr><td>Fondo inicial</td><td class="r">${usd(s.openingUSD)}</td><td class="r">${bs(s.openingBs)}</td></tr>
-      <tr><td>Entradas</td><td class="r">${usd(s.inUSD)}</td><td class="r">${bs(s.inBs)}</td></tr>
-      <tr><td>Salidas (vueltos, gastos)</td><td class="r">${usd(s.outUSD)}</td><td class="r">${bs(s.outBs)}</td></tr>
-      <tr><td><b>Esperado</b></td><td class="r"><b>${usd(exp.usd)}</b></td><td class="r"><b>${bs(exp.bs)}</b></td></tr>
-      ${s.status === 'closed' ? `<tr><td>Contado</td><td class="r">${usd(s.countedUSD)}</td><td class="r">${bs(s.countedBs)}</td></tr>
-      <tr><td>Diferencia</td><td class="r">${usd(s.diffUSD)}</td><td class="r">${bs(s.diffBs)}</td></tr>` : ''}
+    <table><thead><tr><th></th><th class="r">${isVE() ? 'Dólares' : esc(loc().curName)}</th>${isVE() ? '<th class="r">Bolívares</th>' : ''}</tr></thead><tbody>
+      <tr><td>Fondo inicial</td><td class="r">${usd(s.openingUSD)}</td>${isVE() ? `<td class="r">${bs(s.openingBs)}</td>` : ''}</tr>
+      <tr><td>Entradas</td><td class="r">${usd(s.inUSD)}</td>${isVE() ? `<td class="r">${bs(s.inBs)}</td>` : ''}</tr>
+      <tr><td>Salidas (vueltos, gastos)</td><td class="r">${usd(s.outUSD)}</td>${isVE() ? `<td class="r">${bs(s.outBs)}</td>` : ''}</tr>
+      <tr><td><b>Esperado</b></td><td class="r"><b>${usd(exp.usd)}</b></td>${isVE() ? `<td class="r"><b>${bs(exp.bs)}</b></td>` : ''}</tr>
+      ${s.status === 'closed' ? `<tr><td>Contado</td><td class="r">${usd(s.countedUSD)}</td>${isVE() ? `<td class="r">${bs(s.countedBs)}</td>` : ''}</tr>
+      <tr><td>Diferencia</td><td class="r">${usd(s.diffUSD)}</td>${isVE() ? `<td class="r">${bs(s.diffBs)}</td>` : ''}</tr>` : ''}
     </tbody></table>
-    <h2>Ventas por método de pago (equivalente $)</h2>
+    <h2>Ventas por método de pago${isVE() ? ' (equivalente $)' : ''}</h2>
     <table><tbody>${Object.entries(byM).filter(([, v]) => v > 0.004).map(([k, v]) => `<tr><td>${esc(methodLabel(k))}</td><td class="r">${usd(v)}</td></tr>`).join('') || '<tr><td>Sin ventas</td></tr>'}</tbody></table>
     <h2>Movimientos</h2>
     <table><thead><tr><th>Hora</th><th>Concepto</th><th>Categoría</th><th class="r">Monto</th></tr></thead><tbody>
@@ -163,7 +163,7 @@ export function mount(el) {
 
   const render = () => {
     const s = store.openShift;
-    let html = `<div class="view-header"><div><h1 class="view-title">Caja</h1><p class="view-sub">Turnos, efectivo en dólares y bolívares, gastos y arqueo</p></div>
+    let html = `<div class="view-header"><div><h1 class="view-title">Caja</h1><p class="view-sub">Turnos, efectivo${isVE() ? ' en dólares y bolívares' : ''}, gastos y arqueo</p></div>
       <div class="view-actions">${s ? `
         <button class="btn btn-secondary" id="k-in">${icon('arrowDown')} Ingreso</button>
         <button class="btn btn-secondary" id="k-out">${icon('arrowUp')} Gasto / retiro</button>
@@ -172,7 +172,7 @@ export function mount(el) {
       html += `<div class="card center" style="padding:36px 20px">
         <span class="kpi-icon tone-info" style="width:60px;height:60px;margin:0 auto 12px;border-radius:16px">${icon('wallet')}</span>
         <h2 style="font-size:19px">La caja está cerrada</h2>
-        <p class="muted mt" style="max-width:420px;margin-left:auto;margin-right:auto">Abre un turno indicando el efectivo inicial en dólares y bolívares para comenzar a vender.</p>
+        <p class="muted mt" style="max-width:420px;margin-left:auto;margin-right:auto">Abre un turno indicando el efectivo inicial${isVE() ? ' en dólares y bolívares' : ''} para comenzar a vender.</p>
         <button class="btn btn-primary btn-lg mt-lg" id="k-open2">${icon('unlock')} Abrir caja del día</button></div>`;
     } else {
       const exp = expected(s);
@@ -187,11 +187,11 @@ export function mount(el) {
         <div class="card" data-tour="cash">
           <div class="card-header"><div class="card-title"><span class="ico">${icon('cash')}</span>Efectivo esperado en caja</div></div>
           <div class="cash-cols">
-            <div class="cash-cur"><h4>Dólares</h4><div class="cash-expected">${usd(exp.usd)}</div>
+            <div class="cash-cur"><h4>${isVE() ? 'Dólares' : esc(loc().curName)}</h4><div class="cash-expected">${usd(exp.usd)}</div>
               <div class="summary-row small"><span class="muted">Fondo inicial</span><b>${usd(s.openingUSD)}</b></div>
               <div class="summary-row small"><span class="muted">Entradas</span><b class="text-success">+${usd(s.inUSD)}</b></div>
               <div class="summary-row small"><span class="muted">Salidas</span><b class="text-danger">−${usd(s.outUSD)}</b></div></div>
-            <div class="cash-cur"><h4>Bolívares</h4><div class="cash-expected text-bs">${bs(exp.bs)}</div>
+            <div class="cash-cur bs-only"><h4>Bolívares</h4><div class="cash-expected text-bs">${bs(exp.bs)}</div>
               <div class="summary-row small"><span class="muted">Fondo inicial</span><b>${bs(s.openingBs)}</b></div>
               <div class="summary-row small"><span class="muted">Entradas</span><b class="text-success">+${bs(s.inBs)}</b></div>
               <div class="summary-row small"><span class="muted">Salidas</span><b class="text-danger">−${bs(s.outBs)}</b></div></div>
@@ -202,7 +202,7 @@ export function mount(el) {
           <div class="grid grid-3" style="gap:10px">
             <div class="summary-box"><div class="label">Ventas</div><div class="bold num" style="font-size:18px">${usd(s.salesTotal || 0)}</div><div class="xs muted">${s.salesCount || 0} ticket(s)</div></div>
             <div class="summary-box"><div class="label">Abonos</div><div class="bold num" style="font-size:18px">${usd(s.paymentsTotal || 0)}</div><div class="xs muted">cobrados</div></div>
-            <div class="summary-box"><div class="label">Gastos</div><div class="bold num text-danger" style="font-size:18px">${usd(s.expensesUSD || 0)}</div><div class="xs muted">equiv. $</div></div>
+            <div class="summary-box"><div class="label">Gastos</div><div class="bold num text-danger" style="font-size:18px">${usd(s.expensesUSD || 0)}</div>${isVE() ? '<div class="xs muted">equiv. $</div>' : ''}</div>
           </div>
           <div class="label mt">Ventas por método</div>
           ${methods.length ? methods.map(([k, v]) => `<div class="mt" style="margin-top:8px"><div class="between small"><span>${esc(methodLabel(k))}</span><b class="num">${usd(v)}</b></div><div class="bar-track"><div class="bar-fill" style="width:${(v / maxM) * 100}%;background:${PAY_METHODS[k]?.color || 'var(--brand)'}"></div></div></div>`).join('') : '<p class="small muted mt">Aún no hay ventas en este turno.</p>'}

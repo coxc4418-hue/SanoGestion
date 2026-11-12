@@ -1,7 +1,7 @@
 // SanoGestion — Servicios: avances de efectivo y recargas telefónicas
 import { store } from '../store.js';
 import { processSale } from '../ops.js';
-import { esc, usd, bs, num, toast, emptyState, fmtDateTime, parseNum, setBusy, round2, round4, PAY_METHODS, methodLabel, normalize, debounce, addDays, startOfDay, nowISO } from '../utils.js';
+import { esc, usd, bs, num, toast, emptyState, fmtDateTime, parseNum, setBusy, round2, round4, PAY_METHODS, methodLabel, normalize, debounce, addDays, startOfDay, nowISO, isVE } from '../utils.js';
 import { icon } from '../icons.js';
 import { openRateModal } from '../shared.js';
 
@@ -36,12 +36,12 @@ export function mount(el) {
     const s = store.settings;
     if (tab === 'adelanto') {
       $('#s-form').innerHTML = `<form class="stack" id="f-adv">
-        <p class="small muted">El cliente paga con tarjeta o transferencia el monto más la comisión, y tú le entregas el efectivo en bolívares de la caja.</p>
+        <p class="small muted">El cliente paga con tarjeta o transferencia el monto más la comisión, y tú le entregas el efectivo${isVE() ? ' en bolívares' : ''} de la caja.</p>
         <div class="field"><label>Cliente (opcional)</label><input class="input" name="client" placeholder="Nombre del cliente"></div>
         <div class="field"><label>Efectivo a entregar (Bs) *</label><input class="input input-lg" name="amount" inputmode="decimal" placeholder="0,00"></div>
         <div class="field"><label>Comisión (%)</label><input class="input" name="pct" inputmode="decimal" value="${num(s.advanceCommission, 1)}"></div>
         <div class="field"><label>El cliente paga con</label><select class="select" name="method">${['punto', 'pagomovil', 'transferencia', 'biopago'].map((k) => `<option value="${k}">${PAY_METHODS[k].label}</option>`).join('')}</select></div>
-        <div class="summary-box"><div class="summary-row"><span class="muted">Comisión (tu ganancia)</span><b class="text-success" data-com>Bs 0,00</b></div><div class="summary-row total"><span>Total a cobrar</span><b data-tot>Bs 0,00</b></div></div>
+        <div class="summary-box"><div class="summary-row"><span class="muted">Comisión (tu ganancia)</span><b class="text-success" data-com>${bs(0)}</b></div><div class="summary-row total"><span>Total a cobrar</span><b data-tot>${bs(0)}</b></div></div>
         <div class="field"><label>Nota</label><input class="input" name="note" placeholder="Referencia de la operación"></div>
         <button class="btn btn-primary btn-lg btn-block">${icon('check')} Registrar avance</button>
       </form>`;
@@ -53,7 +53,7 @@ export function mount(el) {
         <div class="field"><label>Monto de la recarga (Bs) *</label><input class="input input-lg" name="amount" inputmode="decimal" placeholder="0,00"></div>
         <div class="field"><label>Comisión (%)</label><input class="input" name="pct" inputmode="decimal" value="${num(s.rechargeCommission, 1)}"></div>
         <div class="field"><label>El cliente paga con</label><select class="select" name="method">${['efectivo_bs', 'efectivo_usd', 'pagomovil', 'punto', 'transferencia', 'biopago'].map((k) => `<option value="${k}">${PAY_METHODS[k].label}</option>`).join('')}</select></div>
-        <div class="summary-box"><div class="summary-row"><span class="muted">Comisión (tu ganancia)</span><b class="text-success" data-com>Bs 0,00</b></div><div class="summary-row total"><span>Total a cobrar</span><b data-tot>Bs 0,00</b></div><div class="small muted" data-usd></div></div>
+        <div class="summary-box"><div class="summary-row"><span class="muted">Comisión (tu ganancia)</span><b class="text-success" data-com>${bs(0)}</b></div><div class="summary-row total"><span>Total a cobrar</span><b data-tot>${bs(0)}</b></div><div class="small muted" data-usd></div></div>
         <button class="btn btn-primary btn-lg btn-block">${icon('check')} Registrar recarga</button>
       </form>`;
     }
@@ -106,7 +106,7 @@ export function mount(el) {
           items: [{ name: name + (phone ? ` · ${phone}` : ''), presentation: 'Servicio', multiplier: 1, qty: 1, price: round4(totalBs / rate), cost: round4(a / rate), exempt: true, category: 'Servicios' }],
           payments: [pay],
           customer: null,
-          changeCurrency: 'BS',
+          changeCurrency: isVE() ? 'BS' : 'USD',
           note: record.note,
           service: { serviceId, record },
           extraOut: isAdv ? { bs: a } : null

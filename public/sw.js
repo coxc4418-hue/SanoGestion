@@ -1,9 +1,9 @@
 // SanoGestion — Service Worker (PWA, funcionamiento sin conexión)
-const VERSION = 'sanogestion-v1.4.1';
+const VERSION = 'sanogestion-v1.5.4';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/css/app.css',
-  '/js/main.js', '/js/firebase.js', '/js/store.js', '/js/auth.js', '/js/utils.js', '/js/icons.js', '/js/shared.js', '/js/ops.js', '/js/demo.js', '/js/install.js', '/js/tour.js',
+  '/js/main.js', '/js/firebase.js', '/js/store.js', '/js/auth.js', '/js/utils.js', '/js/country.js', '/js/icons.js', '/js/shared.js', '/js/ops.js', '/js/demo.js', '/js/install.js', '/js/tour.js',
   '/js/views/dashboard.js', '/js/views/pos.js', '/js/views/inventory.js', '/js/views/customers.js', '/js/views/debts.js',
   '/js/views/cash.js', '/js/views/services.js', '/js/views/reports.js', '/js/views/settings.js', '/js/views/admin.js',
   '/assets/logo.svg', '/assets/icon-192.png', '/assets/icon-512.png', '/assets/favicon.png', '/assets/apple-touch-icon.png',

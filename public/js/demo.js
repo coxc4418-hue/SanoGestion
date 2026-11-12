@@ -8,7 +8,7 @@ import { round2, nowISO, todayKey, sha256 } from './utils.js';
 export const DEMO_PIN = '1234';
 
 export const DEMO_MINUTES = 30;
-const DATA_COLLECTIONS = ['products', 'customers', 'sales', 'debts', 'debt_payments', 'cash_shifts', 'cash_movements', 'inventory_logs', 'held_sales', 'services', 'config'];
+export const DATA_COLLECTIONS = ['products', 'customers', 'sales', 'debts', 'debt_payments', 'cash_shifts', 'cash_movements', 'inventory_logs', 'held_sales', 'services', 'config'];
 
 export async function startDemo() {
   await signInAnonymously(auth);

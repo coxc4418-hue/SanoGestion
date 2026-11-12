@@ -4,8 +4,7 @@ import { requirePin } from '../auth.js';
 import { adjustStock } from '../ops.js';
 import {
   esc, usd, bs, num, normalize, toast, openModal, confirmDialog, emptyState, initials, fmtDateTime,
-  parseNum, debounce, setBusy, round2, round4, nowISO, qtyFmt, download, toCSV, parseCSV, compressImage, todayKey
-} from '../utils.js';
+  parseNum, debounce, setBusy, round2, round4, nowISO, qtyFmt, download, toCSV, parseCSV, compressImage, todayKey, isVE, loc } from '../utils.js';
 import { icon } from '../icons.js';
 import { printDoc } from '../shared.js';
 
@@ -36,7 +35,7 @@ export function openProductForm(product = null) {
         <div class="between mb"><b>Costo</b>
           <div class="seg" data-cm><button type="button" data-v="unit">Por unidad</button><button type="button" data-v="bulk">Por bulto</button></div></div>
         <div class="form-grid">
-          <div class="field"><label>Moneda del costo</label><select class="select" name="costCur"><option value="USD">Dólares ($)</option><option value="BS">Bolívares (Bs)</option></select></div>
+          <div class="field bs-only"><label>Moneda del costo</label><select class="select" name="costCur"><option value="USD">Dólares ($)</option><option value="BS">Bolívares (Bs)</option></select></div>
           <div class="field" data-unitcost><label>Costo por unidad</label><input class="input" name="cost" inputmode="decimal" value="${p.cost ? num(p.cost, 4).replace(/0+$/, '').replace(/,$/, '') : ''}" placeholder="0,00"></div>
           <div class="field" data-bulkcost hidden><label>Costo del bulto</label><input class="input" name="bulkCost" inputmode="decimal" value="${p.bulkCost ? num(p.bulkCost) : ''}" placeholder="0,00"></div>
           <div class="field" data-bulkqty hidden><label>Unidades por bulto</label><input class="input" name="bulkQtyCost" inputmode="decimal" value="${p.bulkQty || ''}" placeholder="Ej.: 24"></div>
@@ -46,7 +45,7 @@ export function openProductForm(product = null) {
 
       <div class="card" style="background:var(--surface-2);box-shadow:none">
         <div class="between mb"><b>Precios de venta</b>
-          <select class="select" name="priceCur" style="width:auto"><option value="USD">Precios en $</option><option value="BS">Precios en Bs</option></select></div>
+          <select class="select bs-only" name="priceCur" style="width:auto"><option value="USD">Precios en $</option><option value="BS">Precios en Bs</option></select></div>
         <div class="tier-grid">
           <span></span><span class="label">% ganancia</span><span class="label">Precio final</span>
           ${[0, 1, 2].map((i) => `<span class="label">${i === 0 ? 'Precio 1 *' : 'Precio ' + (i + 1)}</span>
@@ -306,7 +305,7 @@ function openImport() {
     body: `<div class="stack">
       <p class="muted">Sube un archivo CSV (puedes crearlo en Excel con “Guardar como → CSV”). Columnas reconocidas:</p>
       <div class="summary-box small mono">nombre; codigo; categoria; costo; precio; precio2; precio3; stock; minimo; unidad; proveedor</div>
-      <p class="small muted">Costos y precios en dólares. Si el código ya existe en tu inventario, el producto se actualiza (el stock del archivo se suma al actual).</p>
+      <p class="small muted">Costos y precios en ${isVE() ? 'dólares' : esc(loc().curName.toLowerCase())}. Si el código ya existe en tu inventario, el producto se actualiza (el stock del archivo se suma al actual).</p>
       <div class="row-wrap"><button class="btn btn-secondary" data-tpl>${icon('download')} Descargar plantilla</button>
         <input type="file" accept=".csv,text/csv" data-file hidden><button class="btn btn-primary" data-pick>${icon('upload')} Elegir archivo</button></div>
       <div data-prev></div>

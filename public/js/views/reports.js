@@ -4,8 +4,7 @@ import { requirePin } from '../auth.js';
 import { voidSale } from '../ops.js';
 import {
   esc, usd, bs, num, toast, openModal, confirmDialog, emptyState, fmtDateTime, fmtDate, setBusy, qtyFmt,
-  startOfDay, endOfDay, addDays, dayKey, fromKey, todayKey, methodLabel, PAY_METHODS, download, toCSV, promptDialog
-} from '../utils.js';
+  startOfDay, endOfDay, addDays, dayKey, fromKey, todayKey, methodLabel, PAY_METHODS, download, toCSV, promptDialog, loc } from '../utils.js';
 import { icon } from '../icons.js';
 import { printDoc, printReceipt } from '../shared.js';
 
@@ -194,7 +193,7 @@ export function mount(el) {
         ${k('Fiado otorgado', usd(r.credit), `Abonos cobrados: ${usd(r.collected)}`, 'card', 'warning')}
       </div>
       ${series.length ? `<div class="card mb" style="margin-bottom:16px"><div class="card-header"><div class="card-title"><span class="ico">${icon('chart')}</span>Ventas por día</div></div>
-        <div class="chart" style="gap:${series.length > 20 ? 3 : 8}px">${series.map((x) => `<div class="chart-col" title="${fmtDate(x.k)}: ${usd(x.v)}">${series.length <= 14 ? `<span class="chart-val">${x.v ? '$' + num(x.v, 0) : ''}</span>` : ''}<div class="chart-bar" style="height:${Math.max(2, (x.v / maxS) * 100)}%"></div><span class="chart-lbl">${series.length <= 14 ? fromKey(x.k).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : fromKey(x.k).getDate()}</span></div>`).join('')}</div></div>` : ''}
+        <div class="chart" style="gap:${series.length > 20 ? 3 : 8}px">${series.map((x) => `<div class="chart-col" title="${fmtDate(x.k)}: ${usd(x.v)}">${series.length <= 14 ? `<span class="chart-val">${x.v ? usd(x.v, 0) : ''}</span>` : ''}<div class="chart-bar" style="height:${Math.max(2, (x.v / maxS) * 100)}%"></div><span class="chart-lbl">${series.length <= 14 ? fromKey(x.k).toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit' }) : fromKey(x.k).getDate()}</span></div>`).join('')}</div></div>` : ''}
       <div class="grid grid-3">
         <div class="card">
           <div class="card-header"><div class="card-title"><span class="ico">${icon('card')}</span>Cobrado por método</div></div>
@@ -244,7 +243,7 @@ export function mount(el) {
       fmtDateTime(s.date), s.number, s.type === 'service' ? 'Servicio' : 'Venta', s.status === 'voided' ? 'Anulada' : 'Completada', s.customerName || 'Mostrador',
       l.name, l.presentation || '', qtyFmt(l.qty), num(l.price), num(l.total), num(lineCost(l)),
       i === 0 ? num(s.total) : '', i === 0 ? num(s.totalBs) : '', i === 0 ? num(s.rate) : '',
-      i === 0 ? (s.payments || []).map((p) => `${methodLabel(p.method)} ${p.currency === 'BS' ? 'Bs' : '$'}${num(p.amount)}`).join(' + ') : '', i === 0 ? num(s.creditUSD || 0) : ''
+      i === 0 ? (s.payments || []).map((p) => `${methodLabel(p.method)} ${p.currency === 'BS' ? 'Bs' : loc().sym}${num(p.amount)}`).join(' + ') : '', i === 0 ? num(s.creditUSD || 0) : ''
     ])));
     download(`ventas_${dayKey(data.from || new Date())}_${dayKey(data.to || new Date())}.csv`, toCSV(rows), 'text/csv;charset=utf-8');
     toast('Reporte exportado');

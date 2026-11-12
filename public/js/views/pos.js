@@ -3,8 +3,7 @@ import { store } from '../store.js';
 import { processSale } from '../ops.js';
 import {
   esc, num, usd, bs, round2, parseNum, normalize, toast, openModal, confirmDialog, emptyState,
-  qtyFmt, PAY_METHODS, methodLabel, setBusy, fmtTime, debounce, initials, colorFor
-} from '../utils.js';
+  qtyFmt, PAY_METHODS, methodLabel, setBusy, fmtTime, debounce, initials, colorFor, loc, isVE } from '../utils.js';
 import { icon } from '../icons.js';
 import { printReceipt, openRateModal } from '../shared.js';
 import { openCustomerForm } from './customers.js';
@@ -71,7 +70,7 @@ export function mount(el) {
           <div class="card">
             <div class="card-header" style="margin-bottom:10px">
               <div class="card-title"><span class="ico">${icon('cart')}</span>Venta actual</div>
-              <span class="badge badge-neutral">Tasa Bs ${num(store.rate)}</span>
+              <span class="badge badge-neutral bs-only">Tasa ${bs(store.rate)}</span>
             </div>
             <div class="row mb">
               <select class="select grow" id="pos-customer"></select>
@@ -79,11 +78,11 @@ export function mount(el) {
             </div>
             <div class="cart-lines" id="cart-lines"></div>
             <div class="pos-totals mt">
-              <div class="between small muted"><span>Subtotal</span><span class="num" id="t-sub">$ 0,00</span></div>
+              <div class="between small muted"><span>Subtotal</span><span class="num" id="t-sub">${usd(0)}</span></div>
               <div class="between small"><button class="btn btn-ghost btn-xs" id="pos-discount" style="margin-left:-8px">${icon('percent')} Descuento</button><span class="num text-danger" id="t-disc"></span></div>
               <div class="between" style="align-items:flex-end;margin-top:4px">
                 <span class="bold">Total</span>
-                <div class="right"><div class="pos-total-usd" id="t-usd">$ 0,00</div><div class="pos-total-bs" id="t-bs">Bs 0,00</div></div>
+                <div class="right"><div class="pos-total-usd" id="t-usd">${usd(0)}</div><div class="pos-total-bs" id="t-bs">${bs(0)}</div></div>
               </div>
             </div>
             <div class="pos-actions mt">
@@ -96,7 +95,7 @@ export function mount(el) {
       </div>
     </div>
     <div class="pos-mobile-bar" id="pos-mbar">
-      <div><b id="mb-total">$ 0,00</b><small id="mb-sub">0 artículos</small></div>
+      <div><b id="mb-total">${usd(0)}</b><small id="mb-sub">0 artículos</small></div>
       <div class="row">
         <button class="btn btn-sm" style="background:#1e293b;color:#fff" id="mb-view">Ver</button>
         <button class="btn btn-primary btn-sm" id="mb-pay">Cobrar</button>
@@ -144,7 +143,7 @@ export function mount(el) {
         </div>
         <div class="p-price"><b>${usd(pres[0].price)}</b><span>${bs(pres[0].price * rate)}</span></div>
         <div class="p-add">
-          ${pres.length > 1 ? `<select class="select" data-pres>${pres.map((x, i) => `<option value="${i}">${esc(x.name)} · $${num(x.price)}</option>`).join('')}</select>` : ''}
+          ${pres.length > 1 ? `<select class="select" data-pres>${pres.map((x, i) => `<option value="${i}">${esc(x.name)} · ${usd(x.price)}</option>`).join('')}</select>` : ''}
           <button class="btn btn-primary btn-sm" data-add ${out ? 'disabled' : ''}>${icon('plus')}<span class="hide-sm">Agregar</span></button>
         </div>
       </div>`;
@@ -162,7 +161,7 @@ export function mount(el) {
     const sel = $('#pos-customer');
     sel.innerHTML = `<option value="">Cliente: Mostrador</option>` + store.customers.map((c) => {
       const bal = store.customerBalance(c.id);
-      return `<option value="${c.id}" ${c.id === cart.customerId ? 'selected' : ''}>${esc(c.name)}${bal > 0.004 ? ` · debe $${num(bal)}` : ''}</option>`;
+      return `<option value="${c.id}" ${c.id === cart.customerId ? 'selected' : ''}>${esc(c.name)}${bal > 0.004 ? ` · debe ${usd(bal)}` : ''}</option>`;
     }).join('');
     if (cart.customerId && !store.customer(cart.customerId)) cart.customerId = '';
   }
@@ -196,7 +195,7 @@ export function mount(el) {
     $('#t-usd').textContent = usd(t.total);
     $('#t-bs').textContent = bs(t.totalBs);
     $('#tab-count').textContent = qtyFmt(t.items);
-    $('#mb-total').textContent = `${usd(t.total)} · ${bs(t.totalBs)}`;
+    $('#mb-total').textContent = `${usd(t.total)}${isVE() ? ' · ' + bs(t.totalBs) : ''}`;
     $('#mb-sub').textContent = `${qtyFmt(t.items)} artículo${t.items === 1 ? '' : 's'}`;
     $('#pos-mbar').classList.toggle('show', cart.lines.length > 0 && mview === 'catalog');
     $('#pos-pay').disabled = !cart.lines.length;
@@ -377,9 +376,9 @@ export function mount(el) {
     if (!store.openShift) { toast('Abre la caja para poder cobrar', 'warning'); guard(); return; }
     const rate = store.rate;
     const t = totals();
-    const methods = ['efectivo_usd', 'efectivo_bs', 'pagomovil', 'punto', 'transferencia', 'biopago', 'zelle'];
+    const methods = Object.keys(PAY_METHODS);
     const m = openModal({
-      title: 'Registrar pago', sub: `Tasa: Bs ${num(rate)} por $1`, size: 'lg',
+      title: 'Registrar pago', sub: isVE() ? `Tasa: ${bs(rate)} por $1` : '', size: 'lg',
       body: `
         <div class="stack">
           <div class="pay-totals">
@@ -392,12 +391,12 @@ export function mount(el) {
           </div>
           <div class="pay-grid">
             ${methods.map((k) => `<div class="pay-field">
-              <div class="label"><span>${PAY_METHODS[k].label}</span><span class="faint">${PAY_METHODS[k].cur === 'BS' ? 'Bs' : '$'}</span></div>
+              <div class="label"><span>${PAY_METHODS[k].label}</span><span class="faint">${PAY_METHODS[k].cur === 'BS' ? 'Bs' : loc().sym}</span></div>
               <div class="row"><input class="input num" data-pay="${k}" inputmode="decimal" placeholder="0,00"><button type="button" class="btn btn-secondary btn-sm" data-all="${k}">Todo</button></div>
             </div>`).join('')}
           </div>
           <div class="balance-box missing" data-bal><div class="small bold" data-bal-l>Falta por pagar</div><b data-bal-v></b></div>
-          <div class="field" data-change-wrap hidden>
+          <div class="field bs-only" data-change-wrap hidden>
             <label>Entregar vuelto en</label>
             <div class="seg seg-block" data-chg><button type="button" data-c="USD">Dólares ($)</button><button type="button" data-c="BS">Bolívares (Bs)</button></div>
           </div>
@@ -408,13 +407,13 @@ export function mount(el) {
     const q = (s) => m.el.querySelector(s);
     const custSel = q('[data-cust]');
     const fillCust = () => {
-      custSel.innerHTML = `<option value="">Mostrador (sin cliente)</option>` + store.customers.map((c) => `<option value="${c.id}" ${c.id === cart.customerId ? 'selected' : ''}>${esc(c.name)}${store.customerBalance(c.id) > 0.004 ? ` · debe $${num(store.customerBalance(c.id))}` : ''}</option>`).join('');
+      custSel.innerHTML = `<option value="">Mostrador (sin cliente)</option>` + store.customers.map((c) => `<option value="${c.id}" ${c.id === cart.customerId ? 'selected' : ''}>${esc(c.name)}${store.customerBalance(c.id) > 0.004 ? ` · debe ${usd(store.customerBalance(c.id))}` : ''}</option>`).join('');
     };
     fillCust();
     custSel.onchange = () => { cart.customerId = custSel.value; update(); };
     q('[data-newc]').onclick = () => openCustomerForm(null, (c) => { cart.customerId = c.id; fillCust(); renderCustomers(); update(); });
 
-    let changeCur = 'BS';
+    let changeCur = isVE() ? 'BS' : 'USD';
     const readPays = () => methods.map((k) => ({ method: k, currency: PAY_METHODS[k].cur, amount: parseNum(q(`[data-pay="${k}"]`).value) })).filter((p) => p.amount > 0);
     const paidUSD = () => readPays().reduce((a, p) => a + (p.currency === 'BS' ? p.amount / rate : p.amount), 0);
     let userPickedChange = false;
@@ -424,10 +423,10 @@ export function mount(el) {
       const bal = q('[data-bal]');
       const covered = diff >= -0.005;
       if (Math.abs(diff) < 0.005) { bal.className = 'balance-box exact'; q('[data-bal-l]').textContent = 'Pago exacto'; q('[data-bal-v]').textContent = usd(0); }
-      else if (covered) { bal.className = 'balance-box change'; q('[data-bal-l]').textContent = 'Vuelto'; q('[data-bal-v]').textContent = `${usd(diff)} · ${bs(diff * rate)}`; }
-      else { bal.className = 'balance-box missing'; q('[data-bal-l]').textContent = paid > 0 ? 'Falta por pagar' : 'Monto pendiente'; q('[data-bal-v]').textContent = `${usd(-diff)} · ${bs(-diff * rate)}`; }
+      else if (covered) { bal.className = 'balance-box change'; q('[data-bal-l]').textContent = 'Vuelto'; q('[data-bal-v]').textContent = `${usd(diff)}${isVE() ? ' · ' + bs(diff * rate) : ''}`; }
+      else { bal.className = 'balance-box missing'; q('[data-bal-l]').textContent = paid > 0 ? 'Falta por pagar' : 'Monto pendiente'; q('[data-bal-v]').textContent = `${usd(-diff)}${isVE() ? ' · ' + bs(-diff * rate) : ''}`; }
       q('[data-change-wrap]').hidden = !(covered && diff > 0.004);
-      if (!userPickedChange) changeCur = readPays().some((p) => p.method === 'efectivo_usd') && !readPays().some((p) => p.method === 'efectivo_bs') ? 'USD' : 'BS';
+      if (!userPickedChange) changeCur = !isVE() ? 'USD' : readPays().some((p) => p.method === 'efectivo_usd') && !readPays().some((p) => p.method === 'efectivo_bs') ? 'USD' : 'BS';
       m.el.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('active', b.dataset.c === changeCur));
       q('[data-done]').disabled = !covered;
       q('[data-fiado]').disabled = covered;
@@ -478,7 +477,7 @@ export function mount(el) {
         <p class="muted small">Ticket ${esc(sale.number)}</p>
         <div class="summary-box mt" style="text-align:left">
           <div class="summary-row"><span class="muted">Total</span><b>${usd(sale.total)}</b></div>
-          <div class="summary-row"><span class="muted">En bolívares</span><b class="text-bs">${bs(sale.totalBs)}</b></div>
+          <div class="summary-row bs-only"><span class="muted">En bolívares</span><b class="text-bs">${bs(sale.totalBs)}</b></div>
           <div class="summary-row"><span class="muted">Pago</span><b>${sale.payments.length ? sale.payments.map((p) => esc(methodLabel(p.method))).join(' + ') : 'Fiado'}</b></div>
           ${chg ? `<div class="summary-row total"><span>Vuelto</span><b class="text-success">${chg}</b></div>` : ''}
           ${sale.creditUSD > 0 ? `<div class="summary-row total"><span>Fiado a ${esc(sale.customerName)}</span><b class="text-warning">${usd(sale.creditUSD)}</b></div>` : ''}
@@ -502,6 +501,6 @@ export function mount(el) {
     store.on('shift', guard),
     store.on('settings', onRate)
   ];
-  function onRate() { renderProducts(); renderCart(); guard(); const b = el.querySelector('.pos-cart .badge-neutral'); if (b) b.textContent = `Tasa Bs ${num(store.rate)}`; }
+  function onRate() { renderProducts(); renderCart(); guard(); const b = el.querySelector('.pos-cart .badge-neutral'); if (b) b.textContent = `Tasa ${bs(store.rate)}`; }
   return () => { offs.forEach((o) => o()); window.removeEventListener('keydown', onKey); };
 }

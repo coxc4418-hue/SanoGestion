@@ -6,7 +6,8 @@ import { icon } from '../icons.js';
 import { debtStatus, printDoc } from '../shared.js';
 import { openCustomerDetail } from './customers.js';
 
-const PAYMENT_METHODS = ['efectivo_usd', 'efectivo_bs', 'pagomovil', 'transferencia', 'punto', 'biopago', 'zelle'];
+// Formas de pago del país (en Venezuela: $, Bs, pago móvil, transferencia, punto, Biopago y Zelle)
+const methodKeys = () => Object.keys(PAY_METHODS);
 
 export function openPaymentModal(customerId = '') {
   const rate = store.rate;
@@ -16,10 +17,10 @@ export function openPaymentModal(customerId = '') {
     title: 'Registrar abono', sub: 'Se aplica automáticamente a los fiados más antiguos',
     body: `<form class="stack" data-f>
       <div class="field"><label>Cliente</label>
-        <select class="select" data-c><option value="">Selecciona un cliente…</option>${debtors.map((c) => `<option value="${c.id}" ${c.id === customerId ? 'selected' : ''}>${esc(c.name)} · debe $${num(store.customerBalance(c.id))}</option>`).join('')}</select></div>
-      <div class="summary-box"><div class="summary-row"><span class="muted">Saldo actual</span><b data-cur>$ 0,00</b></div><div class="summary-row"><span class="muted">Saldo luego del abono</span><b data-new class="text-success">$ 0,00</b></div></div>
+        <select class="select" data-c><option value="">Selecciona un cliente…</option>${debtors.map((c) => `<option value="${c.id}" ${c.id === customerId ? 'selected' : ''}>${esc(c.name)} · debe ${usd(store.customerBalance(c.id))}</option>`).join('')}</select></div>
+      <div class="summary-box"><div class="summary-row"><span class="muted">Saldo actual</span><b data-cur>${usd(0)}</b></div><div class="summary-row"><span class="muted">Saldo luego del abono</span><b data-new class="text-success">${usd(0)}</b></div></div>
       <div class="form-grid">
-        <div class="field"><label>Método</label><select class="select" data-m>${PAYMENT_METHODS.map((k) => `<option value="${k}">${PAY_METHODS[k].label}</option>`).join('')}</select></div>
+        <div class="field"><label>Método</label><select class="select" data-m>${methodKeys().map((k) => `<option value="${k}">${PAY_METHODS[k].label}</option>`).join('')}</select></div>
         <div class="field"><label data-al>Monto ($)</label><input class="input input-lg" data-a inputmode="decimal" placeholder="0,00"></div>
       </div>
       <div class="hint" data-eq></div>
@@ -37,7 +38,7 @@ export function openPaymentModal(customerId = '') {
     q('[data-cur]').textContent = usd(b);
     const a = amountUSD();
     q('[data-new]').textContent = usd(Math.max(0, b - a));
-    q('[data-eq]').textContent = a > 0 ? (cur() === 'BS' ? `Equivale a ${usd(a)} a tasa Bs ${num(rate)}` : `Equivale a ${bs(a * rate)}`) + (a > b + 0.005 ? ' · El monto excede la deuda: solo se aplicará el saldo pendiente.' : '') : '';
+    q('[data-eq]').textContent = a > 0 ? (cur() === 'BS' ? `Equivale a ${usd(a)} a tasa ${bs(rate)}` : `Equivale a ${bs(a * rate)}`) + (a > b + 0.005 ? ' · El monto excede la deuda: solo se aplicará el saldo pendiente.' : '') : '';
   };
   const fillAll = () => { const b = balance(); q('[data-a]').value = b > 0 ? num(cur() === 'BS' ? b * rate : b) : ''; upd(); };
   q('[data-c]').onchange = fillAll;
