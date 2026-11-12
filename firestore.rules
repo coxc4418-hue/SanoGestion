@@ -30,7 +30,11 @@ service cloud.firestore {
     }
 
     function tenantActive(tenantId) {
-      return tenantData(tenantId).get('active', true) == true;
+      let t = tenantData(tenantId);
+      let paid = t.get('paidUntil', null);
+      return t.get('active', true) == true
+        && t.get('deleted', false) != true
+        && (paid == null || paid > request.time);
     }
 
     // Una demo solo puede crear/modificar datos mientras no haya vencido
@@ -43,6 +47,12 @@ service cloud.firestore {
     match /usernames/{username} {
       allow get: if true;
       allow list: if false;
+      allow write: if isSuperAdmin();
+    }
+
+    // Aviso general para todas las sedes (lo publica el administrador)
+    match /system/{docId} {
+      allow read: if signedIn();
       allow write: if isSuperAdmin();
     }
 
@@ -63,7 +73,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
         || (isOwner(tenantId)
             && !request.resource.data.diff(resource.data).affectedKeys()
-                 .hasAny(['active', 'ownerUid', 'ownerEmail', 'code', 'createdAt', 'demo', 'expiresAt', 'expireAt']));
+                 .hasAny(['active', 'ownerUid', 'ownerEmail', 'code', 'createdAt', 'demo', 'expiresAt', 'expireAt', 'deleted', 'paidUntil', 'plan', 'frozenReason', 'ownerName', 'ownerPhone', 'notes']));
 
       allow delete: if isSuperAdmin() || (isOwner(tenantId) && resource.data.get('demo', false) == true);
 

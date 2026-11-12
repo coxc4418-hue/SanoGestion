@@ -256,6 +256,11 @@ a { color: var(--brand); }
 .demo-banner button { background: rgba(255,255,255,.2); color: #fff; border: 0; border-radius: 8px; padding: 5px 10px; font-weight: 700; margin-left: 6px; }
 .demo-ending { animation: pulse 1s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .55; } }
+.banner { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.banner svg { width: 17px; height: 17px; vertical-align: -3px; }
+.banner button { border: 0; background: transparent; color: inherit; border-radius: 8px; padding: 4px 8px; }
+.announce-banner { background: var(--info-soft); color: var(--info); }
+.warn-top { background: var(--warning-soft); color: var(--warning); }
 .offline-banner { padding: 6px 16px; background: var(--warning-soft); color: var(--warning); font-size: 12.5px; font-weight: 600; text-align: center; }
 
 .content { padding: 24px 28px 40px; width: 100%; max-width: 1480px; margin: 0 auto; }
@@ -609,17 +614,17 @@ a { color: var(--brand); }
   .sidebar { transform: translateX(-100%); box-shadow: var(--shadow-lg); }
   .sidebar.open { transform: none; }
   .sidebar-backdrop.open { display: block; }
-  .main { margin-left: 0; }
+  .main { margin-left: 0; padding-bottom: env(safe-area-inset-bottom); }
   .topbar { display: flex; }
-  .content { padding: 16px 14px calc(var(--bottomnav-h) + 24px); }
+  .content { padding: 16px 14px calc(var(--bottomnav-h) + env(safe-area-inset-bottom) + 24px); }
   .bottom-nav {
-    display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 150;
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 150; box-sizing: border-box;
     height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
     background: var(--surface); border-top: 1px solid var(--border);
   }
   .bottom-nav button {
     border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    font-size: 10.5px; font-weight: 600; color: var(--text-3);
+    font-size: 10.5px; font-weight: 600; color: var(--text-3); position: relative; min-width: 0; padding: 0 2px; white-space: nowrap; overflow: visible;
   }
   .bottom-nav button svg { width: 21px; height: 21px; }
   .bottom-nav button.active { color: var(--brand); }
@@ -823,3 +828,21 @@ img, svg, video, canvas { max-width: 100%; }
 .help-item > svg { width: 16px; height: 16px; color: var(--text-2); flex: none; }
 .help-item-ico { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); flex: none; }
 .help-item-ico svg { width: 18px; height: 18px; }
+
+/* Búsqueda global (Ctrl + K) */
+.search-big { height: 52px; border-radius: 14px; font-size: 16px; }
+.search-big input { font-size: 16px; }
+.search-big kbd { font-size: 11px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); color: var(--text-3, var(--muted)); }
+.sres { margin-top: 12px; max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.sres .section-title { font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; color: var(--text-3, var(--faint)); margin: 10px 0 2px; }
+.sitem { display: flex; align-items: center; gap: 12px; width: 100%; padding: 9px 10px; border: 0; background: none; border-radius: 12px; text-align: left; color: inherit; cursor: pointer; }
+.sitem:hover, .sitem:focus-visible { background: var(--surface-2); }
+.sitem small { display: block; color: var(--text-3, var(--muted)); font-size: 12.5px; }
+.sitem > svg:last-child { color: var(--text-3, var(--faint)); width: 18px; height: 18px; }
+
+/* Buscador del menú lateral */
+.sb-search { margin: 4px 12px 8px; display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 10px 0 12px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); border-radius: 11px; color: rgba(255,255,255,.65); font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+.sb-search:hover { border-color: var(--brand); color: #fff; }
+.sb-search svg { width: 17px; height: 17px; flex: none; }
+.sb-search span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-search kbd { font: 600 10.5px/1 inherit; padding: 3px 5px; border-radius: 5px; border: 1px solid currentColor; opacity: .7; }

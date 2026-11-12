@@ -2,7 +2,7 @@
 import { auth, onAuthStateChanged } from './firebase.js';
 import { store, getTenant, createTenantDoc } from './store.js';
 import { session, login, logout, authErrorMessage, SUPER_EMAIL, usernameOf } from './auth.js';
-import { esc, toast, num, closeAllModals, $, $$, setBusy, confirmDialog, toggleTheme, openModal } from './utils.js';
+import { esc, toast, num, fmtDate, closeAllModals, $, $$, setBusy, confirmDialog, toggleTheme, openModal } from './utils.js';
 import { icon } from './icons.js';
 import { openRateModal } from './shared.js';
 import { isStandalone, platform, bindInstallButtons } from './install.js';
@@ -175,17 +175,54 @@ function renderError(e) {
   $('#err-out').onclick = () => logout();
 }
 
-function renderSuspended(t) {
+const SALES_PHONE = '584221906045';
+const salesWa = (msg) => `https://wa.me/${SALES_PHONE}?text=${encodeURIComponent(msg)}`;
+const tsMillis = (v) => (v && typeof v.toMillis === 'function' ? v.toMillis() : v ? new Date(v).getTime() : 0);
+const paidUntilISO = (t) => (t?.paidUntil ? new Date(tsMillis(t.paidUntil)).toISOString() : null);
+function tenantState(t) {
+  if (!t || t.deleted) return 'missing';
+  if (t.active === false) return 'frozen';
+  if (t.paidUntil && tsMillis(t.paidUntil) < Date.now()) return 'expired';
+  return 'ok';
+}
+
+function renderSuspended(t, kind = tenantState(t)) {
   teardownApp();
+  const texts = {
+    frozen: ['Cuenta congelada', `El acceso de <b>${esc(t?.name || 'tu negocio')}</b> está temporalmente congelado${t?.frozenReason ? ': ' + esc(t.frozenReason) : '.'} Tus datos están a salvo.`],
+    expired: ['Tu plan venció', `El plan de <b>${esc(t?.name || 'tu negocio')}</b> venció el ${fmtDate(paidUntilISO(t))}. Renuévalo para seguir trabajando; tus datos están a salvo.`],
+    missing: ['Cuenta sin sede asignada', 'Esta cuenta no tiene una sede activa en SanoGestion. Contáctanos para activarla.']
+  }[kind] || ['Sede suspendida', `La cuenta <b>${esc(t?.name || '')}</b> está temporalmente suspendida.`];
   root().innerHTML = `
     <div class="auth-screen" style="grid-template-columns:1fr"><section class="auth-panel"><div class="auth-card center">
       <div class="kpi-icon tone-warning" style="margin:0 auto 12px;width:56px;height:56px">${icon('lock')}</div>
-      <h2>Sede suspendida</h2>
-      <p class="muted mt">La cuenta <b>${esc(t?.name || '')}</b> está temporalmente suspendida. Contacta al administrador de SanoGestion para reactivarla.</p>
-      <button class="btn btn-secondary btn-block mt-lg" id="sus-out">Cerrar sesión</button>
+      <h2>${texts[0]}</h2>
+      <p class="muted mt">${texts[1]}</p>
+      <a class="btn btn-whatsapp btn-lg btn-block mt-lg" href="${salesWa(`Hola, necesito ayuda con mi cuenta de SanoGestion (${t?.code || session.user?.email || ''}).`)}" target="_blank" rel="noopener">${icon('whatsapp')} Escríbenos por WhatsApp</a>
+      <p class="hint center mt">+58 422-190 6045</p>
+      <button class="btn btn-secondary btn-block mt" id="sus-out">Cerrar sesión</button>
     </div></section></div>`;
   hideBoot();
   $('#sus-out').onclick = () => logout();
+}
+
+function planWarning() {
+  const t = store.tenant;
+  if (!t?.paidUntil || session.isSuper || store.isDemo) return '';
+  const days = Math.ceil((tsMillis(t.paidUntil) - Date.now()) / 86400000);
+  if (days > 5) return '';
+  return `<div class="banner warn-top"><span>${icon('clock')} Tu plan vence ${days <= 0 ? 'hoy' : `en ${days} día(s)`} (${fmtDate(paidUntilISO(t))}).</span><a class="btn btn-sm btn-whatsapp" href="${salesWa('Hola, quiero renovar mi plan de SanoGestion.')}" target="_blank" rel="noopener">${icon('whatsapp')} Renovar</a></div>`;
+}
+
+function renderAnnouncement() {
+  const el = $('#announce');
+  if (!el) return;
+  const a = store.announcement;
+  let dismissed = '';
+  try { dismissed = localStorage.getItem('sg_announce') || ''; } catch (_) {}
+  if (!a?.active || !a.text || dismissed === a.updatedAt) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="banner announce-banner"><span>${icon('bell')} ${esc(a.text)}</span><button id="an-x" aria-label="Cerrar aviso">${icon('x')}</button></div>`;
+  $('#an-x').onclick = () => { try { localStorage.setItem('sg_announce', a.updatedAt); } catch (_) {} el.innerHTML = ''; };
 }
 
 async function enterTenant(tenantId) {
@@ -205,7 +242,7 @@ async function enterTenant(tenantId) {
     await createTenantDoc(tenantId, t);
   }
   if (!t && session.isSuper) { sessionStorage.removeItem('sg_view_tenant'); await renderAdminPanel(); return; }
-  if (t && t.active === false && !session.isSuper) { renderSuspended(t); return; }
+  if (tenantState(t) !== 'ok' && !session.isSuper) { renderSuspended(t); return; }
   if (session.isSuper) sessionStorage.setItem('sg_view_tenant', tenantId);
 
   await store.start(tenantId);
@@ -331,6 +368,7 @@ function renderShell() {
       <aside class="sidebar" id="sidebar">
         <div class="sb-brand"><img src="/assets/logo.svg" alt=""><div><b>SanoGestion</b><small>Gestión para tiendas</small></div></div>
         <div class="sb-tenant"><div class="xs">Sede</div><b id="sb-tenant-name">${esc(tName)}</b></div>
+        <button class="sb-search" id="sb-search">${icon('search')}<span>Buscar producto, cliente…</span><kbd>Ctrl K</kbd></button>
         <nav class="sb-nav">${navItems()}<button class="nav-item" id="sb-help">${icon('info')}<span>Ayuda y tutorial</span></button></nav>
         <div class="sb-foot">
           <button class="rate-pill" id="sb-rate" title="Cambiar tasa del día"><span>Tasa BCV</span><b id="sb-rate-val">Bs ${num(store.rate)}</b></button>
@@ -348,12 +386,15 @@ function renderShell() {
       <div class="main">
         ${session.isSuper ? `<div class="admin-banner"><span>${'Modo administrador'} · Viendo la sede <b>${esc(tName)}</b></span><button id="ab-back">← Volver al panel de sedes</button></div>` : ''}
         ${store.isDemo ? `<div class="demo-banner"><span>${icon('star')} <b>Modo demo</b><span class="demo-pin">${icon('lock')} PIN: <b>1234</b></span><span class="hide-sm">· Los datos se borran al terminar</span></span><span class="demo-clock">${icon('clock')} <b id="demo-left">30:00</b> restantes <button id="demo-end">Terminar demo</button></span></div>` : ''}
+        ${planWarning()}
+        <div id="announce"></div>
         <div class="offline-banner" id="offline-banner" hidden>Sin conexión: puedes seguir trabajando, los cambios se sincronizarán al volver internet.</div>
         <header class="topbar">
           <button class="btn btn-ghost btn-icon" id="tb-menu" aria-label="Menú">${icon('menu')}</button>
           <img src="/assets/logo.svg" alt="">
           <div class="grow" style="min-width:0"><div class="tb-title ellipsis" id="tb-title">SanoGestion</div><div class="tb-sub ellipsis">${esc(tName)}</div></div>
           ${isStandalone() ? '' : `<button class="btn btn-ghost btn-icon btn-sm" data-install aria-label="Instalar app" title="Instalar app">${icon('install')}</button>`}
+          <button class="btn btn-ghost btn-icon btn-sm" id="tb-search" aria-label="Buscar" title="Buscar (Ctrl + K)">${icon('search')}</button>
           <button class="rate-mini" id="tb-rate">Bs ${num(store.rate)}</button>
         </header>
         <main class="content" id="view"></main>
@@ -369,6 +410,8 @@ function renderShell() {
 
   $$('[data-nav]').forEach((b) => b.addEventListener('click', () => { navigate(b.dataset.nav); closeSidebar(); }));
   $('#tb-menu').onclick = openSidebar;
+  $('#tb-search') && ($('#tb-search').onclick = openSearch);
+  $('#sb-search').onclick = () => { closeSidebar(); openSearch(); };
   $('#bn-more').onclick = openSidebar;
   $('#sb-backdrop').onclick = closeSidebar;
   $('#sb-rate').onclick = openRateModal;
@@ -393,10 +436,12 @@ function renderShell() {
     if (evt === 'tenant') {
       const n = store.tenant?.name || store.businessName;
       $('#sb-tenant-name') && ($('#sb-tenant-name').textContent = n);
-      if (store.tenant && store.tenant.active === false && !session.isSuper) renderSuspended(store.tenant);
+      if (tenantState(store.tenant) !== 'ok' && !session.isSuper && !store.isDemo) renderSuspended(store.tenant);
     }
+    if (evt === 'announcement') renderAnnouncement();
     if (evt === 'denied' && !session.isSuper) toast('Acceso denegado a los datos de la sede.', 'danger', 5000);
   });
+  renderAnnouncement();
   updateNetwork();
 }
 
@@ -487,8 +532,10 @@ window.addEventListener('popstate', () => {
 });
 
 // Atajos de teclado (punto de venta)
+export function openSearch() { import('./views/search.js').then((m) => m.openSearch()); }
 window.addEventListener('keydown', (e) => {
   if (!document.getElementById('view')) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); }
   if (e.key === 'F1') { e.preventDefault(); navigate('vender'); }
   if (e.key === 'F2') { e.preventDefault(); navigate('vender').then(() => setTimeout(() => $('#pos-search')?.focus(), 80)); }
 });

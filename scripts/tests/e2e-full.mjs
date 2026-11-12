@@ -367,24 +367,65 @@ try {
   check(true, 'inicia sesión con la contraseña nueva');
 
   // ====================================================================
-  section('12. Administrador: crear, renombrar, suspender y reactivar sedes');
+  section('12. Administrador: crear, editar, plan, congelar, aviso, exportar, eliminar y restaurar sedes');
   const ad = await newPage();
   await login('admin', acc.admin.password, ad);
-  await waitText('Panel de administración multisede', 15000, ad); await sleep(1500);
+  await waitText('Panel de administración de sedes', 15000, ad); await sleep(1500);
   await click('#a-new', ad);
   await type(M + 'input[name=name]', 'Bodega Nueva', ad); await type(M + 'input[name=username]', 'nueva01', ad);
   await type(M + 'input[name=password]', 'Clave-Nueva-1', ad); await type(M + 'input[name=pin]', '5555', ad);
+  await type(M + 'input[name=ownerName]', 'Pedro Pérez', ad); await type(M + 'input[name=ownerPhone]', '04141234567', ad);
   await click(M + '[data-ok]', ad); await waitText('Sede creada', 20000, ad); await click(M + '[data-close]', ad); await sleep(1500);
-  check(await ad.evaluate(() => document.body.innerText.includes('Bodega Nueva')), 'sede nueva creada desde el panel');
+  check(await ad.evaluate(() => document.body.innerText.includes('Bodega Nueva') && document.body.innerText.includes('Pedro Pérez')), 'sede nueva creada desde el panel con dueño y teléfono');
+  check(await ad.evaluate(() => /Vence/.test(document.body.innerText) && document.querySelectorAll('#a-filters .chip').length === 6), 'muestra plan con vencimiento y filtros por estado');
   const nu = await newPage();
   await login('nueva01', 'Clave-Nueva-1', nu); await waitText('Hola, Bodega Nueva', 15000, nu);
   check(true, 'la sede nueva inicia sesión con su usuario');
   const nid = await nu.evaluate(async () => (await import('/js/firebase.js')).auth.currentUser.uid);
-  await click(`[data-tog="${nid}"]`, ad); await click(M + '[data-yes]', ad); await sleep(1500);
-  await waitText('Sede suspendida', 15000, nu);
-  check(true, 'al suspenderla, la sede queda bloqueada al instante');
+  await click(`[data-tog="${nid}"]`, ad); await click(M + '[data-ok]', ad); await sleep(1500);
+  await waitText('Cuenta congelada', 15000, nu);
+  check(await nu.evaluate(() => document.body.innerText.includes('Pago pendiente')), 'al congelarla, la sede queda bloqueada al instante y ve el motivo');
   await click(`[data-tog="${nid}"]`, ad); await click(M + '[data-yes]', ad); await sleep(1000);
   check(await ad.evaluate(() => document.body.innerText.includes('Activa')), 'sede reactivada');
+  // Editar: nombre, plan y fecha vencida -> la sede se bloquea por plan vencido
+  await click(`[data-ed="${nid}"]`, ad);
+  await type(M + 'input[name=name]', 'Bodega Nueva Editada', ad); await select(M + 'select[name=plan]', 'Premium', ad);
+  await ad.evaluate((m) => { const i = document.querySelector(m + 'input[name=paidUntil]'); i.value = '2020-01-01'; }, M);
+  await click(M + '[data-ok]', ad); await sleep(1500);
+  check(await ad.evaluate(() => document.body.innerText.includes('Bodega Nueva Editada') && document.body.innerText.includes('Premium') && document.body.innerText.includes('Vencida')), 'editar sede: nombre, plan y vencimiento');
+  await nu.reload({ waitUntil: 'networkidle2' }); await waitText('Tu plan venció', 15000, nu);
+  check(true, 'con el plan vencido la sede queda bloqueada');
+  await click(`[data-renew="${nid}"]`, ad); await click(M + '[data-yes]', ad); await sleep(1500);
+  await nu.reload({ waitUntil: 'networkidle2' }); await waitText('Hola, Bodega Nueva', 15000, nu);
+  check(true, 'renovar 30 días reactiva la sede');
+  // Reiniciar PIN
+  await click(`[data-ed="${nid}"]`, ad); await click(M + '[data-pin]', ad); await click(M + '[data-yes]', ad); await sleep(1200);
+  check(await ad.evaluate(() => /PIN reiniciado: \d{4}/.test(document.body.innerText)), 'reiniciar PIN de la sede');
+  await ad.evaluate(() => document.querySelectorAll('#modals [data-close]').forEach((b) => b.click())); await sleep(500);
+  // Aviso general
+  await click('#a-ann', ad); await type(M + '[data-t]', 'Mantenimiento el domingo', ad);
+  await ad.evaluate((m) => { const c = document.querySelector(m + '[data-on]'); if (!c.checked) c.click(); }, M);
+  await click(M + '[data-ok]', ad); await sleep(1500);
+  await waitText('Mantenimiento el domingo', 15000, nu);
+  check(true, 'el aviso general aparece en la sede');
+  // Exportar CSV
+  await click('#a-csv', ad); await sleep(1500);
+  check(readdirSync(DL).some((f) => f.startsWith('sedes-sanogestion')), 'exporta la lista de sedes en CSV');
+  // Búsqueda global en la sede
+  await nu.keyboard.down('Control'); await nu.keyboard.press('k'); await nu.keyboard.up('Control'); await sleep(500);
+  await nu.type('.search-modal [data-q]', 'caja'); await sleep(500);
+  check(await nu.evaluate(() => document.querySelectorAll('.search-modal .sitem').length > 0), 'búsqueda global Ctrl+K encuentra secciones');
+  await nu.keyboard.press('Enter'); await sleep(1200);
+  check(await nu.evaluate(() => location.hash === '#/caja'), 'Enter abre el resultado de la búsqueda');
+  // Eliminar y restaurar
+  await click(`[data-ed="${nid}"]`, ad); await click(M + '[data-del]', ad); await click(M + '[data-yes]', ad);
+  await sleep(400); await ad.evaluate(() => [...document.querySelectorAll('#modals [data-no], #modals [data-close]')].pop()?.click()); await sleep(2500);
+  await nu.reload({ waitUntil: 'networkidle2' }); await waitText('Cuenta sin sede asignada', 15000, nu).catch(() => {});
+  check(await nu.evaluate(() => /Cuenta sin sede asignada|Usuario|Iniciar/.test(document.body.innerText)), 'la sede eliminada ya no puede trabajar');
+  await click('#a-filters [data-f="deleted"]', ad);
+  await click(`[data-restore="${nid}"]`, ad); await click(M + '[data-yes]', ad); await sleep(1500);
+  check(await ad.evaluate(() => document.body.innerText.includes('Sede restaurada')), 'restaurar sede eliminada');
+  await click('#a-filters [data-f="all"]', ad);
   await click(`[data-enter="${await p.evaluate(async () => (await import('/js/firebase.js')).auth.currentUser.uid)}"]`, ad);
   await waitText('Modo administrador', 15000, ad);
   check(true, 'el administrador entra a ver una sede');

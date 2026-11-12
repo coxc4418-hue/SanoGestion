@@ -175,9 +175,9 @@ export function mount(el) {
       toast('Restaurando… no cierres la aplicación', 'info', 4000);
       for (const [col, list] of Object.entries(json.data)) {
         if (![...DATA_COLLECTIONS, 'config'].includes(col) || !Array.isArray(list)) continue;
-        for (let i = 0; i < list.length; i += 400) {
+        for (let i = 0; i < list.length; i += 80) {
           const b = store.batch();
-          list.slice(i, i + 400).forEach(({ id, ...rest }) => { if (id && !(col === 'config' && id !== 'settings')) b.set(store.ref(col, id), rest); });
+          list.slice(i, i + 80).forEach(({ id, ...rest }) => { if (id && !(col === 'config' && id !== 'settings')) b.set(store.ref(col, id), rest); });
           await store.commit(b);
         }
       }
@@ -200,9 +200,9 @@ export function mount(el) {
       try {
         for (const c of DATA_COLLECTIONS) {
           const list = await store.listAll(c);
-          for (let i = 0; i < list.length; i += 400) {
+          for (let i = 0; i < list.length; i += 80) {
             const b = store.batch();
-            list.slice(i, i + 400).forEach((d) => b.delete(store.ref(c, d.id)));
+            list.slice(i, i + 80).forEach((d) => b.delete(store.ref(c, d.id)));
             await store.commit(b);
           }
         }

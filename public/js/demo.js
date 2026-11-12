@@ -103,9 +103,9 @@ export async function purgeDemoTenant(tenantId) {
   for (const c of DATA_COLLECTIONS) {
     try {
       const snap = await getDocs(collection(db, 'tenants', tenantId, c));
-      for (let i = 0; i < snap.docs.length; i += 400) {
+      for (let i = 0; i < snap.docs.length; i += 80) {
         const b = writeBatch(db);
-        snap.docs.slice(i, i + 400).forEach((d) => b.delete(d.ref));
+        snap.docs.slice(i, i + 80).forEach((d) => b.delete(d.ref));
         await b.commit();
       }
     } catch (e) { console.warn('[demo] limpieza', c, e?.code || e); }

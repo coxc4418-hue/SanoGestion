@@ -120,6 +120,7 @@ class Store {
       if (!Array.isArray(this.settings.categories) || !this.settings.categories.length) this.settings.categories = DEFAULT_CATEGORIES;
     });
     this._unsubs.push(onSnapshot(this.ref('config', 'security'), (s) => { this.security = s.exists() ? s.data() : {}; }, () => {}));
+    this._unsubs.push(onSnapshot(doc(db, 'system', 'announcement'), (s) => { this.announcement = s.exists() ? s.data() : null; this.emit('announcement'); }, () => {}));
     listen(this.col('products'), 'products', (s) => {
       this.products = s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'es'));
     });
@@ -259,6 +260,9 @@ export async function getUsername(username) {
 export async function setUsername(username, data) {
   await setDoc(doc(db, 'usernames', String(username).toLowerCase()), data);
 }
+export async function deleteUsername(username) { await deleteDoc(doc(db, 'usernames', String(username).toLowerCase())); }
+export async function setAnnouncement(data) { await setDoc(doc(db, 'system', 'announcement'), data); }
+export async function getAnnouncement() { const s = await getDoc(doc(db, 'system', 'announcement')); return s.exists() ? s.data() : null; }
 export async function deleteTenantDoc(id) {
   await deleteDoc(doc(db, 'tenants', id));
 }
