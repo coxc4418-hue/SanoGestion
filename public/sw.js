@@ -1,5 +1,5 @@
 // SanoGestion — Service Worker (PWA, funcionamiento sin conexión)
-const VERSION = 'sanogestion-v1.5.4';
+const VERSION = 'sanogestion-v1.5.5';
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
 const SHELL = [
   '/', '/index.html', '/manifest.webmanifest', '/css/app.css',
